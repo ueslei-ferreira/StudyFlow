@@ -13,7 +13,7 @@ const Login = () => {
     e.preventDefault();
     try {
       const response = await api.post('/auth/login/', { username, password });
-      login(response.data.access, response.data.refresh);
+      await login(response.data.access, response.data.refresh);
       navigate('/dashboard');
     } catch (error) {
       alert('Falha no login');

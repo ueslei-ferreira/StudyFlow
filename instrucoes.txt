@@ -1,0 +1,410 @@
+Visão geral do projeto
+
+Objetivo: plataforma onde o usuário escolhe uma área (ex.: Backend), recebe um checklist gerado automaticamente (MVP: baseado em templates), marca progresso e recebe insights simples (estatísticas e dicas humoradas/informativas). Foco em UX leve, dados úteis e deploy profissional.
+
+Público-alvo: estudantes de TI, iniciante/júnior querendo estudar sistematicamente.
+
+Principais diferenciais (MVP):
+
+Geração automática de checklist por área e nível.
+
+Marcação de progresso item-a-item.
+
+Dashboard com estatísticas (conclusão %, streaks, tempo estimado).
+
+Feedback/insight automatizado simples (regras heurísticas).
+
+Autenticação, persistência, deploy pronto.
+
+Stack recomendado (alinhado ao que você já conhece)
+
+Backend: Django + Django REST Framework (rápido pra CRUD, auth pronta).
+
+Alternativa: FastAPI (mais leve, performance), se preferir.
+
+Banco: PostgreSQL
+
+Frontend: React (Vite) + React Query + Tailwind (ou CSS simples)
+
+Cache/Tasks: Redis (cache + Celery para tarefas agendadas)
+
+Autenticação: JWT (SimpleJWT) + refresh tokens
+
+Containerização & Deploy: Docker + docker-compose local; deploy em Render / Railway / Fly.io (vou detalhar Render)
+
+CI/CD: GitHub Actions
+
+Observabilidade: Sentry (erros), Logstash/Datadog (opcional)
+
+E-mails: SMTP (SendGrid/SMTP do serviço)
+
+Extras úteis: Swagger / Redoc (docs API), pre-commit, black/isort/flake8
+
+MVP: funcionalidades detalhadas
+
+Cadastro/login (email + senha) + recuperação de senha.
+
+Perfil do usuário (nome, nível, áreas de interesse).
+
+Templates de checklist por área (Backend, Redes, DevOps).
+
+Gerar checklist (instância do template) com metadata (prazo opcional, prioridade).
+
+Marcar itens como feito / reabrir / anotar tempo gasto.
+
+Dashboard: % concluído, streaks, gráficos simples (última semana).
+
+Insights (regras heurísticas): ex.: "Você concluiu 3 itens em dias seguidos → bom ritmo", "Falta focar em testes".
+
+Exportar checklist (PDF/CSV) — opcional pós-MVP.
+
+Swagger docs para API.
+
+Arquitetura (texto)
+
+Client (React) ←→ REST API (Django/DRF) ←→ PostgreSQL
+↑
+Redis (cache, Celery broker)
+↑
+Celery workers (tarefas agendadas, e-mails)
+
+Modelo de dados (tabelas principais)
+
+User (Django default auth.User ou custom)
+
+id, username, email, password_hash, is_active, created_at
+
+Profile
+
+user (FK)
+
+display_name
+
+level (iniciante/júnior/…)
+
+timezone, preferences (JSON)
+
+StudyArea
+
+id, slug, name, description
+
+ChecklistTemplate
+
+id, title, area (FK StudyArea), level, estimated_time_minutes, description, items (JSON or relacionar ChecklistTemplateItem)
+
+ChecklistTemplateItem
+
+id, template (FK), order, title, description, estimated_minutes, tags (JSON)
+
+UserChecklist
+
+id, user (FK), template (FK), title (overridable), created_at, due_date, progress_cached (float), metadata (JSON)
+
+UserChecklistItem
+
+id, checklist (FK UserChecklist), template_item (FK), title, order, is_done (bool), done_at, time_spent_minutes, notes (text)
+
+ActivityLog
+
+id, user, action_type, target_type, target_id, payload (JSON), created_at
+
+Stats (opcional/gerado dinamicamente)
+
+pode ser derivado de UserChecklist e ActivityLog
+
+Rotas da API (principais) — formato, exemplos de payload
+
+Base: https://api.seuprojeto.com/api/v1
+
+Autenticação
+
+POST /auth/register/
+
+Body: { "email": "...", "password": "...", "display_name": "..." }
+
+Resp: 201 { "id", "email", "token": "..." }
+
+POST /auth/login/
+
+Body: { "email", "password" }
+
+Resp: { "access": "...", "refresh": "..." }
+
+POST /auth/token/refresh/ — refresh JWT.
+
+Usuário / Perfil
+
+GET /me/ — retorna perfil (autenticado).
+
+PATCH /me/ — atualiza perfil.
+
+Study Areas / Templates (público)
+
+GET /areas/ — lista áreas.
+
+GET /templates/?area=backend&level=junior — lista templates.
+
+GET /templates/{id}/ — detalhes.
+
+Checklists (usuário)
+
+POST /checklists/ — criar instância
+
+Body: { "template_id": 3, "title": "Meu checklist", "due_date": "2025-12-31" }
+
+Resp: 201 { "id", "title", "items": [...] }
+
+GET /checklists/ — listar do usuário
+
+GET /checklists/{id}/ — detalhes + items
+
+PATCH /checklists/{id}/ — atualizar metadata (ex.: title)
+
+DELETE /checklists/{id}/
+
+POST /checklists/{id}/items/{item_id}/toggle — marcar/desmarcar (ou PATCH /checklists/{id}/items/{item_id}/ com {is_done: true})
+
+PATCH /checklists/{id}/items/{item_id}/time — atualizar time_spent_minutes
+
+GET /checklists/{id}/insights/ — retorna insights heurísticos (ou /users/me/insights/)
+
+Stats / Dashboard
+
+GET /dashboard/summary/ — resumo: percentuais, streak, itens concluídos por semana.
+
+GET /dashboard/activity/?days=30 — logs agregados por dia.
+
+Admin (templates/areas)
+
+POST /admin/templates/ — criar template (protegido por role)
+
+PATCH /admin/templates/{id}/
+
+Regras de negócio / heurísticas de insights (exemplos)
+
+Streak: conta dias consecutivos com ≥1 item concluído.
+
+Ritmo: média de itens concluídos por dia (últimos 7 dias).
+
+Recomendação: se média < 1 e usuário tem > 7 itens pendentes → sugerir “faça 1 item por dia”.
+
+Tempo estimado: soma de estimated_minutes dos itens pendentes.
+
+Mensagens humoradas baseadas em thresholds (0 itens → “Começa já, campeão”, 100% → “Você é mito”).
+
+Estrutura do backend (Django)
+
+Projeto: studycheck/
+
+Apps:
+
+users (auth + profile)
+
+areas (StudyArea, templates)
+
+checklists (UserChecklist, items)
+
+insights (regras, jobs)
+
+core (settings, utils)
+
+Django packages úteis
+
+djangorestframework
+
+djangorestframework-simplejwt
+
+django-cors-headers
+
+psycopg2-binary
+
+django-environ (env vars)
+
+celery + redis
+
+drf-yasg ou drf-spectacular (docs swagger)
+
+django-filter
+
+Passo-a-passo de implementação (backend)
+
+Config repo e ambiente
+
+git init + criar repo no GitHub.
+
+python -m venv .venv
+
+pip install django djangorestframework djangorestframework-simplejwt psycopg2-binary django-environ celery redis
+
+django-admin startproject studycheck .
+
+Criar apps
+
+python manage.py startapp users
+
+python manage.py startapp areas
+
+python manage.py startapp checklists
+
+Registrar apps em settings.py.
+
+Configurar settings
+
+Usar django-environ para DATABASE_URL, SECRET_KEY, DEBUG, ALLOWED_HOSTS.
+
+Configurar REST_FRAMEWORK e SIMPLE_JWT.
+
+Configurar CORS (corsheaders).
+
+Modelos
+
+Implementar modelos listados no item “Modelo de dados”.
+
+Rodar python manage.py makemigrations e migrate.
+
+Serializers & Views
+
+Criar serializers para templates, checklist, itens.
+
+Views com ViewSets (ModelViewSet) + routers (DefaultRouter).
+
+Endpoints protegidos por permission classes.
+
+Autenticação
+
+Implementar endpoints de registro/login (SimpleJWT).
+
+Add email verification (opcional).
+
+Tests
+
+Escrever testes unitários para modelos, serializers e endpoints principais.
+
+Celery
+
+Configurar Celery + Redis para tarefas (ex.: enviar e-mails, gerar insights periódicos).
+
+Adicionar task generate_insights_for_user(user_id).
+
+Docs
+
+Integrar Swagger UI em /docs/.
+
+Seeders
+
+Script manage.py loaddata ou comando custom python manage.py seed_templates pra popular templates iniciais.
+
+Frontend: estrutura e implementação (React + Vite)
+
+Comandos iniciais
+
+npm create vite@latest studycheck-web --template react
+
+cd studycheck-web
+
+npm install axios react-query react-router-dom tailwindcss
+
+Páginas principais
+
+/ Landing (cta: criar conta)
+
+/auth/login, /auth/register, /auth/forgot
+
+/dashboard resumo
+
+/checklists lista
+
+/checklists/:id visão do checklist + items
+
+/templates explorar templates
+
+/profile editar perfil
+
+/admin (se necessário)
+
+Componentes
+
+Header, Footer, ProtectedRoute, ChecklistCard, ItemRow, ProgressBar, InsightCard, Modal
+
+State
+
+React Query para chamadas API + cache
+
+Context para auth (armazenar access token + refresh handling)
+
+UI
+
+Tailwind para prototipagem rápida
+
+Use formulários simples (react-hook-form opcional)
+
+Fluxos
+
+Ao criar checklist, frontend faz POST /checklists/ → recebe checklist com itens já preenchidos.
+
+Ao marcar item, chama PATCH .../items/{id} → atualizar UI (optimistic update com React Query).
+
+Docker (local & produção)
+
+Dockerfile (backend) — exemplo simples
+
+FROM python:3.11-slim
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+WORKDIR /app
+COPY pyproject.toml requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["gunicorn", "studycheck.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+
+
+Dockerfile (frontend) — build estático
+
+FROM node:18 AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+
+docker-compose.yml (local dev)
+
+version: "3.8"
+services:
+  web:
+    build: ./backend
+    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+    env_file: .env
+    ports: ["8000:8000"]
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:80"]
+    depends_on:
+      - web
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: studycheck
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+volumes:
+  pgdata:

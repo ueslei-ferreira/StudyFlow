@@ -11,8 +11,9 @@ Uma plataforma de checklists de estudo para desenvolvedores, focada em organiza�
 ### Backend
 - **Python & Django REST Framework:** API robusta e escalável.
 - **JWT (JSON Web Tokens):** Autenticação segura e stateless.
-- **PostgreSQL:** Banco de dados relacional (via Docker).
+- **PostgreSQL:** Banco de dados relacional.
 - **Gunicorn:** Servidor de aplicação para produção.
+- **Swagger/OpenAPI:** Documentação automática da API.
 
 ### Frontend
 - **React (Vite) & TypeScript:** Desenvolvimento moderno, rápido e tipado.
@@ -22,13 +23,13 @@ Uma plataforma de checklists de estudo para desenvolvedores, focada em organiza�
 
 ### DevOps & Qualidade
 - **Docker & Docker Compose:** Ambiente de desenvolvimento consistente e containerizado.
-- **Nginx:** Servidor web para servir o frontend e fazer proxy reverso.
+- **Railway:** Plataforma de Cloud (PaaS) para hospedagem do Backend e Banco de Dados.
+- **Vercel:** Hospedagem otimizada para o Frontend.
 - **GitHub Actions (CI):** Pipeline de integração contínua rodando testes e linting automaticamente.
-- **ESLint & Prettier:** Padronização de código.
 
 ---
 
-## Funcionalidades
+## 🚀 Funcionalidades
 
 -  **Autenticação:** Cadastro e Login de usuários com tokens JWT.
 -  **Templates de Estudo:** Geração automática de checklists baseados em áreas (Backend, Frontend, etc.).
@@ -38,12 +39,12 @@ Uma plataforma de checklists de estudo para desenvolvedores, focada em organiza�
 
 ---
 
-## Como Rodar o Projeto
+## 💻 Como Rodar o Projeto Localmente
 
 ### Pré-requisitos
 - Docker e Docker Compose instalados.
 
-### Passo a Passo (Recomendado)
+### Passo a Passo (Via Docker - Recomendado)
 
 1. **Clone o repositório:**
    ```bash
@@ -65,20 +66,52 @@ Uma plataforma de checklists de estudo para desenvolvedores, focada em organiza�
 
 ---
 
-##  Decisões Arquiteturais
+## ☁️ Deploy (Produção)
+
+O projeto está configurado para deploy contínuo:
+
+### Backend (Railway)
+- O backend é hospedado no **Railway**.
+- Utiliza um serviço PostgreSQL gerenciado.
+- A configuração de build é definida via `Dockerfile` e `Procfile`.
+- Variáveis de ambiente configuradas no painel do Railway (`DATABASE_URL`, `SECRET_KEY`, etc).
+
+### Frontend (Vercel)
+- O frontend é hospedado na **Vercel**.
+- Conecta-se à API do Railway.
+
+---
+
+## ⚙️ Variáveis de Ambiente (.env)
+
+Para rodar localmente sem Docker ou configurar a produção, as seguintes variáveis são utilizadas:
+
+```env
+# Backend
+DEBUG=True
+SECRET_KEY=sua-chave-secreta
+ALLOWED_HOSTS=*
+DATABASE_URL=postgres://user:password@localhost:5432/db_name
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://seu-frontend.vercel.app
+
+# Frontend (.env.local)
+VITE_API_URL=http://localhost:8000/api/v1
+```
+
+---
+
+## 🏗️ Decisões Arquiteturais
 
 - **Separação de Responsabilidades:** Backend apenas como API REST e Frontend como SPA consumindo a API.
 - **React Query:** Escolhido para eliminar a complexidade de gerenciamento de estado global (Redux) para dados assíncronos, garantindo cache e atualizações otimistas.
-- **Docker:** Utilizado para garantir que o ambiente de desenvolvimento seja idêntico ao de produção, eliminando o problema de "na minha máquina funciona".
-- **Typagem Estrita:** TypeScript utilizado no frontend para prevenir erros em tempo de compilação e facilitar a manutenção.
+- **Docker:** Utilizado para garantir que o ambiente de desenvolvimento seja idêntico ao de produção.
+- **Typagem Estrita:** TypeScript utilizado no frontend para prevenir erros em tempo de compilação.
 
 ---
 
-##  Próximos Passos (Melhorias Futuras)
+## ✅ Próximos Passos
 
+- [x] Configurar Deploy Automático (Railway/Vercel).
 - [ ] Implementar testes de integração (E2E) com Cypress ou Playwright.
 - [ ] Adicionar modo escuro/claro (Dark Mode).
 - [ ] Permitir que usuários criem seus próprios templates personalizados.
-- [ ] Deploy automático (CD) em plataforma cloud (Render/AWS).
-
----
